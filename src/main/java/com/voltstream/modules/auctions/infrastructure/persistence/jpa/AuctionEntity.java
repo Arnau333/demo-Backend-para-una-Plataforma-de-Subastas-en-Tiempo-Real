@@ -12,7 +12,6 @@ import java.util.UUID;
 @Getter @Setter
 public class AuctionEntity {
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
     
     private String title;
