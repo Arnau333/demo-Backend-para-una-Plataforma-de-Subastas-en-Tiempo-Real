@@ -7,6 +7,8 @@ Backend REST API para una plataforma de subastas en tiempo real desarrollado con
 - ✅ Crear subastas con precio inicial y duración
 - ✅ Listar todas las subastas activas
 - ✅ Realizar pujas en subastas activas
+- ✅ **Notificaciones en TIEMPO REAL** vía WebSockets (STOMP)
+- ✅ **Seguridad con JWT** (Autenticación Stateless mediante Tokens)
 - ✅ Validación de reglas de negocio (pujas mayores al precio actual, subastas cerradas)
 - ✅ Arquitectura limpia y desacoplada
 - ✅ Base de datos H2 en memoria para desarrollo
@@ -17,46 +19,31 @@ El proyecto sigue **Arquitectura Hexagonal** con separación clara de capas:
 
 ```
 src/main/java/com/voltstream/
-├── config/                          # Configuración de Spring
-│   └── SecurityConfig.java
+├── config/                          # Configuración Core (Seguridad, JWT, WebSocket)
 ├── modules/
-│   └── auctions/
-│       ├── application/             # Casos de uso (lógica de aplicación)
-│       │   ├── CreateAuctionUseCase.java
-│       │   └── PlaceBidUseCase.java
-│       ├── domain/                  # Núcleo del negocio (sin dependencias)
-│       │   ├── model/
-│       │   │   ├── Auction.java
-│       │   │   └── repository/
-│       │   │       └── AuctionRepository.java (Puerto)
-│       │   └── exception/
-│       │       ├── AuctionClosedException.java
-│       │       ├── AuctionNotFoundException.java
-│       │       └── InvalidBidAmountException.java
-│       └── infrastructure/          # Adaptadores (REST, BD, etc.)
-│           ├── AuctionController.java
-│           ├── rest/dto/
-│           │   ├── CreateAuctionRequest.java
-│           │   └── CreateAuctionResponse.java
-│           └── persistence/jpa/
-│               ├── AuctionEntity.java
-│               ├── JpaAuctionRepositoryAdapter.java
-│               └── SpringDataAuctionRepository.java
+│   ├── auctions/                    # Módulo principal de Subastas
+│   │   ├── application/             # Casos de uso
+│   │   ├── domain/                  # Núcleo del negocio (Modelos, Excepciones, Puertos)
+│   │   └── infrastructure/          # Adaptadores (REST, JPA, Mensajería)
+│   ├── users/                       # Gestión de usuarios y Auth (Nuevo)
+│   └── websocket/                   # Infraestructura de tiempo real (Nuevo)
 ```
 
 ### Capas:
 
-- **Domain**: Lógica de negocio pura, sin dependencias externas
-- **Application**: Casos de uso que orquestan la lógica de dominio
-- **Infrastructure**: Implementaciones concretas (REST API, JPA, etc.)
+- **Domain**: Lógica de negocio pura, sin dependencias externas. Contiene las entidades y las interfaces de los repositorios (puertos).
+- **Application**: Casos de uso que orquestan el flujo de datos.
+- **Infrastructure**: Implementaciones concretas (REST API, JPA, Adaptadores de Repositorio, Configuración de WebSockets).
 
 ## 🛠️ Tecnologías
 
-- **Java 17**
+- **Java 17 / 21**
 - **Spring Boot 4.0.2**
 - **Spring Data JPA**
-- **Spring Security**
-- **H2 Database** (en memoria)
+- **Spring Security** (Con filtros JWT personalizados)
+- **Spring WebSocket** (STOMP + SockJS)
+- **JJWT** (Para la gestión de JSON Web Tokens)
+- **H2 Database** (En memoria)
 - **Lombok**
 - **Maven**
 
@@ -68,20 +55,17 @@ src/main/java/com/voltstream/
 ## ⚙️ Instalación y Ejecución
 
 ### 1. Clonar el repositorio
-
 ```bash
 git clone <url-del-repositorio>
 cd "demo Backend para una Plataforma de Subastas en Tiempo Real"
 ```
 
 ### 2. Compilar el proyecto
-
 ```bash
 ./mvnw clean install
 ```
 
 ### 3. Ejecutar la aplicación
-
 ```bash
 ./mvnw spring-boot:run
 ```
@@ -90,12 +74,15 @@ La aplicación estará disponible en: `http://localhost:8080`
 
 ## 📡 API Endpoints
 
-### Crear una subasta
+### 🔐 Autenticación
+- `POST /api/auth/register`: Registro de nuevos usuarios.
+- `POST /api/auth/login`: Retorna un `{"token": "..."}` válido para 5 horas.
 
-```http
-POST /api/auctions
-Content-Type: application/json
+### 🔨 Subastas (Requiere Header `Authorization: Bearer <token>`)
 
+#### Crear una subasta
+- `POST /api/auctions`
+```json
 {
   "title": "iPhone 15 Pro",
   "startPrice": 500.00,
@@ -103,106 +90,39 @@ Content-Type: application/json
 }
 ```
 
-**Respuesta:**
-```json
-{
-  "auctionId": "550e8400-e29b-41d4-a716-446655440000"
-}
-```
+#### Listar todas y pujar
+- `GET /api/auctions`: Lista todas las subastas activas.
+- `POST /api/auctions/{auctionId}/bids?amount=550.00`: Realiza una puja.
 
-### Listar todas las subastas
+## 📡 WebSockets (Notificaciones Push)
 
-```http
-GET /api/auctions
-```
-
-**Respuesta:**
-```json
-[
-  {
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "title": "iPhone 15 Pro",
-    "currentPrice": 500.00,
-    "endTime": "2024-02-08T15:30:00",
-    "active": true
-  }
-]
-```
-
-### Realizar una puja
-
-```http
-POST /api/auctions/{auctionId}/bids?amount=550.00
-```
-
-**Respuesta:**
-```
-200 OK
-```
-
-## 🧪 Ejemplos de uso con cURL
-
-```bash
-# Crear subasta
-curl -X POST http://localhost:8080/api/auctions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "Laptop Gaming",
-    "startPrice": 800.00,
-    "durationHours": 48
-  }'
-
-# Listar subastas
-curl http://localhost:8080/api/auctions
-
-# Realizar puja
-curl -X POST "http://localhost:8080/api/auctions/{auctionId}/bids?amount=850.00"
-```
-
-## 🗄️ Base de Datos
-
-El proyecto usa **H2 Database** en memoria para desarrollo. La consola H2 está habilitada:
-
-- **URL**: `http://localhost:8080/h2-console`
-- **JDBC URL**: `jdbc:h2:mem:voltstreamdb`
-- **Usuario**: `sa`
-- **Contraseña**: `789`
+El sistema notifica automáticamente cambios sin necesidad de refrescar el navegador:
+- **Conexión**: `ws://localhost:8080/ws`
+- **Topic General**: `/topic/auctions` (Nuevas subastas)
+- **Topic por Subasta**: `/topic/auctions/{id}` (Actualización de precios al recibir pujas)
 
 ## 🔒 Seguridad
 
-La configuración de seguridad está deshabilitada para facilitar el desarrollo y testing:
-- CSRF deshabilitado
-- Todos los endpoints son públicos
-
-⚠️ **Nota**: Esta configuración es solo para desarrollo/demo. En producción se debe implementar autenticación y autorización adecuadas.
+La API utiliza un esquema de seguridad **Stateless**:
+- **JWT**: Cada petición protegida requiere el token en el header `Authorization`.
+- **Rutas Públicas**: Solo `/api/auth/**` (auth) y `/ws/**` (websockets) son accesibles sin token.
 
 ## 📝 Reglas de Negocio
 
-1. **Pujas válidas**: Deben ser mayores al precio actual
-2. **Subastas cerradas**: No se pueden realizar pujas en subastas finalizadas
-3. **Duración**: Las subastas tienen una fecha de finalización
-4. **Precio inicial**: Toda subasta comienza con un precio base
+1. **Pujas válidas**: Deben ser siempre superiores al precio actual.
+2. **Subastas cerradas**: No se permiten pujas si el tiempo ha expirado.
+3. **Autenticación**: Solo usuarios autenticados pueden operar en el sistema de subastas.
 
 ## 🎯 Principios Aplicados
 
-- **Arquitectura Hexagonal**: Separación clara entre dominio e infraestructura
-- **DDD**: Modelado rico del dominio con reglas de negocio encapsuladas
-- **SOLID**: Código mantenible y extensible
-- **Clean Code**: Código legible y autodocumentado
+- **Arquitectura Hexagonal**: Máximo desacoplamiento.
+- **DDD (Domain-Driven Design)**: Lógica centralizada en el dominio.
+- **SOLID & Clean Code**: Código mantenible y fácil de leer.
 
 ## 🚧 Próximas Mejoras
-
-- [ ] WebSocket para actualizaciones en tiempo real
-- [ ] Sistema de autenticación JWT
-- [ ] Historial de pujas
-- [ ] Notificaciones a usuarios
-- [ ] Tests unitarios e integración
-- [ ] Documentación con Swagger/OpenAPI
-
-## 📄 Licencia
-
-Este es un proyecto de demostración para portafolio.
+- [ ] Historial de pujas detallado.
+- [ ] Notificaciones por Email o Push externas.
+- [ ] Documentación interactiva con Swagger.
 
 ## 👤 Autor
-
-Desarrollado como proyecto de demostración de arquitectura backend.
+Desarrollado como proyecto de demostración de arquitectura backend profesional.
