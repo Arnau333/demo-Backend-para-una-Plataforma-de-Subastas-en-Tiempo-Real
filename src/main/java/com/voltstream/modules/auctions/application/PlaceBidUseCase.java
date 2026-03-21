@@ -16,12 +16,14 @@ public class PlaceBidUseCase {
         this.repository = repository;
     }
 
-    public void execute(UUID auctionId, BigDecimal amount) {
+    public void execute(UUID auctionId, BigDecimal amount, String bidderName) {
         Auction auction = repository.findById(auctionId)
             .orElseThrow(() -> new AuctionNotFoundException("Auction not found"));
 
         auction.executeBid(amount, LocalDateTime.now());
 
+        // Aquí deberíamos guardar la puja en el repositorio si tuvieras un BidRepository
+        repository.saveBid(auctionId, amount, bidderName); 
         repository.save(auction);
     }
 }

@@ -10,5 +10,6 @@ public interface AuctionRepository {
     // Definimos qué necesitamos, pero NO cómo se hace (eso es Infrastructure)
     Optional<Auction> findById(UUID id);
     void save(Auction auction);
+    void saveBid(UUID auctionId, java.math.BigDecimal amount, String bidderName);
     List<Auction> findAll();
 }

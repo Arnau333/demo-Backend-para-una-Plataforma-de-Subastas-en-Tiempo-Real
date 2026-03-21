@@ -13,9 +13,23 @@ import java.util.stream.Collectors;
 public class JpaAuctionRepositoryAdapter implements AuctionRepository {
 
     private final SpringDataAuctionRepository springRepository;
+    private final SpringDataBidRepository bidRepository;
 
-    public JpaAuctionRepositoryAdapter(SpringDataAuctionRepository springRepository) {
+    public JpaAuctionRepositoryAdapter(SpringDataAuctionRepository springRepository, SpringDataBidRepository bidRepository) {
         this.springRepository = springRepository;
+        this.bidRepository = bidRepository;
+    }
+
+    @Override
+    public void saveBid(UUID auctionId, java.math.BigDecimal amount, String bidderName) {
+        AuctionEntity auctionEntity = springRepository.findById(auctionId)
+            .orElseThrow(() -> new RuntimeException("Auction not found"));
+        BidEntity bid = new BidEntity();
+        bid.setAmount(amount);
+        bid.setBidderName(bidderName);
+        bid.setTimestamp(LocalDateTime.now());
+        bid.setAuction(auctionEntity);
+        bidRepository.save(bid);
     }
 
     @Override

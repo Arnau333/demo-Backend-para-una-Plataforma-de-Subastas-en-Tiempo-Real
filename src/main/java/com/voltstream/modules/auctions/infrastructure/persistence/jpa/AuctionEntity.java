@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.Setter;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -22,6 +23,9 @@ public class AuctionEntity {
     private LocalDateTime endTime;
     
     private boolean active;
+
+    @OneToMany(mappedBy = "auction", cascade = CascadeType.ALL)
+    private List<BidEntity> bids;
 
     @Version
     private Long version;

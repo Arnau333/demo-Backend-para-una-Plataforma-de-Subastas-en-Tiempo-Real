@@ -4,6 +4,7 @@ import com.voltstream.modules.auctions.application.CreateAuctionUseCase;
 import com.voltstream.modules.auctions.application.PlaceBidUseCase;
 import com.voltstream.modules.auctions.domain.model.Auction;
 import com.voltstream.modules.auctions.domain.model.repository.AuctionRepository;
+import com.voltstream.modules.auctions.domain.exception.AuctionNotFoundException;
 import com.voltstream.modules.auctions.infrastructure.rest.dto.CreateAuctionRequest;
 import com.voltstream.modules.auctions.infrastructure.rest.dto.CreateAuctionResponse;
 import org.springframework.http.HttpStatus;
@@ -50,6 +51,11 @@ public class AuctionController {
     @GetMapping
     public List<Auction> getAllAuctions() {
         return auctionRepository.findAll();
+    }
+
+    @GetMapping("/{id}")
+    public Auction getAuctionById(@PathVariable UUID id) {
+        return auctionRepository.findById(id).orElseThrow(() -> new AuctionNotFoundException("Subasta no encontrada"));
     }
 
     @PostMapping("/{id}/bids")
