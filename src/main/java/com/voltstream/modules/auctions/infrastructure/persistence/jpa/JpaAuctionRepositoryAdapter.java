@@ -4,6 +4,8 @@ import com.voltstream.modules.auctions.domain.model.Auction;
 import com.voltstream.modules.auctions.domain.model.repository.AuctionRepository;
 
 import org.springframework.stereotype.Component;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -21,7 +23,7 @@ public class JpaAuctionRepositoryAdapter implements AuctionRepository {
     }
 
     @Override
-    public void saveBid(UUID auctionId, java.math.BigDecimal amount, String bidderName) {
+    public void saveBid(UUID auctionId, BigDecimal amount, String bidderName) {
         AuctionEntity auctionEntity = springRepository.findById(auctionId)
             .orElseThrow(() -> new RuntimeException("Auction not found"));
         BidEntity bid = new BidEntity();
@@ -56,4 +58,18 @@ public class JpaAuctionRepositoryAdapter implements AuctionRepository {
             .map(entity -> new Auction(entity.getId(), entity.getTitle(), entity.getCurrentPrice(), entity.getEndTime(), entity.isActive()))
             .collect(Collectors.toList());
     }
+
+    @Override
+    public List<Object[]> findBidsByAuctionId(UUID auctionId) {
+        return bidRepository.findByAuctionIdOrderByTimestampDesc(auctionId)
+            .stream()
+            .map(bid -> new Object[]{
+                bid.getId(),
+                bid.getAmount(),
+                bid.getBidderName(),
+                bid.getTimestamp()
+            })
+            .collect(Collectors.toList());
+    }
 }
+

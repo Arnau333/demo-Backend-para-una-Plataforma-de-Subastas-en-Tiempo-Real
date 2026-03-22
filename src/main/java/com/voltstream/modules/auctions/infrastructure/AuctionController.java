@@ -5,14 +5,18 @@ import com.voltstream.modules.auctions.application.PlaceBidUseCase;
 import com.voltstream.modules.auctions.domain.model.Auction;
 import com.voltstream.modules.auctions.domain.model.repository.AuctionRepository;
 import com.voltstream.modules.auctions.domain.exception.AuctionNotFoundException;
+import com.voltstream.modules.auctions.infrastructure.rest.dto.BidResponse;
 import com.voltstream.modules.auctions.infrastructure.rest.dto.CreateAuctionRequest;
 import com.voltstream.modules.auctions.infrastructure.rest.dto.CreateAuctionResponse;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 @RestController
@@ -37,10 +41,10 @@ public class AuctionController {
         try {
             LocalDateTime endTime = LocalDateTime.now().plusHours(request.getDurationHours() != null ? request.getDurationHours() : 24);
             UUID auctionId = createAuctionUseCase.execute(request.getTitle(), request.getStartPrice(), endTime);
-            
+
             // Broadcast new auction event via WebSocket
             messagingTemplate.convertAndSend("/topic/auctions", "New auction created: " + request.getTitle());
-            
+
             return new CreateAuctionResponse(auctionId);
         } catch (Exception e) {
             e.printStackTrace();
@@ -58,17 +62,35 @@ public class AuctionController {
         return auctionRepository.findById(id).orElseThrow(() -> new AuctionNotFoundException("Subasta no encontrada"));
     }
 
+    @GetMapping("/{id}/bids")
+    public List<BidResponse> getBidsByAuctionId(@PathVariable UUID id) {
+        return auctionRepository.findBidsByAuctionId(id)
+            .stream()
+            .map(row -> new BidResponse(
+                (UUID) row[0],
+                (BigDecimal) row[1],
+                (String) row[2],
+                (LocalDateTime) row[3]
+            ))
+            .collect(Collectors.toList());
+    }
+
     @PostMapping("/{id}/bids")
-    public String placeBid(@PathVariable UUID id, @RequestParam Double amount) {
+    public String placeBid(
+            @PathVariable UUID id,
+            @RequestParam Double amount,
+            @AuthenticationPrincipal UserDetails userDetails) {
         try {
-            placeBidUseCase.execute(id, BigDecimal.valueOf(amount));
-            
+            String bidderName = userDetails != null ? userDetails.getUsername() : "Anónimo";
+            placeBidUseCase.execute(id, BigDecimal.valueOf(amount), bidderName);
+
             // Broadcast bid update via WebSocket
-            messagingTemplate.convertAndSend("/topic/auctions/" + id, "New bid placed: " + amount);
-            
+            messagingTemplate.convertAndSend("/topic/auctions/" + id, "New bid placed: " + amount + " by " + bidderName);
+
             return "Puja realizada con éxito";
         } catch (RuntimeException e) {
             return "Error al pujar: " + e.getMessage();
         }
     }
 }
+
